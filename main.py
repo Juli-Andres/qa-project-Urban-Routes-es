@@ -67,6 +67,8 @@ class UrbanRoutesPage:
 #Localizadores Punto 6 Pedir una manta y pañuelos.
     boton_manta = (By.XPATH, '//*[@id="root"]/div/div[3]/div[3]/div[2]/div[2]/div[4]/div[2]/div[1]/div/div[2]/div/span')
     confirmacion_manta = (By.XPATH, '//*[@id="root"]/div/div[3]/div[3]/div[2]/div[2]/div[4]/div[2]/div[1]/div/div[2]/div/input')
+    option_switches_inputs = (By.CLASS_NAME, 'switch-input')
+    option_switches = (By.CLASS_NAME, 'switch')
 
 #Localizadores Punto 7 Pedir 2 helados.
     boton_adicionar_helados = (By.XPATH, '//*[@id="root"]/div/div[3]/div[3]/div[2]/div[2]/div[4]/div[2]/div[3]/div/div[2]/div[1]/div/div[2]/div/div[3]')
@@ -74,11 +76,9 @@ class UrbanRoutesPage:
 
 #Localizadores Punto 8 Aparece el modal para buscar un taxi.
     boton_reservar_taxi = (By.XPATH, "//span[@class='smart-button-main' and text()='Pedir un taxi']")
-    #boton_reservar_taxi = (By.CLASS_NAME, "smart-button-main")
+    order_wait_screen_title = (By.XPATH, "//div[@class='order shown']//div[@class='order-body']//div[@class='order-header']//div[@class='order-header-title']")
 
 
-#Localizadores Punto 9 Pantalla informacion del conductor.
-    pantalla_info_conductor = (By.CLASS_NAME, "order-header-content")
 
     def __init__(self, driver):
         self.driver = driver
@@ -236,14 +236,16 @@ class UrbanRoutesPage:
 #   localizar y activar los botones para adicionar extras
     def get_adicionar_mantas(self):
         return WebDriverWait(self.driver,5).until(
-            EC.element_to_be_clickable(self.boton_manta)
+            EC.element_to_be_clickable(self.option_switches)
         )
 
     def click_adicionar_mantas(self):
         self.get_adicionar_mantas().click()
 
-    def get_confirmacion_mantas(self):
-        return self.driver.find_element(*self.confirmacion_manta).is_selected()
+    def get_manta_checked(self):
+        switches = self.driver.find_elements(*self.option_switches_inputs)
+        return switches[0].get_property('checked')
+
 
 #   localizar el campo helados y adicionar 2
     def get_boton_adicionar_helados(self):
@@ -266,13 +268,15 @@ class UrbanRoutesPage:
     def click_boton_reservar_taxi(self):
         self.get_boton_reservar_taxi().click()
 
-#   Visualizar informacion del conductor
-    def get_pantalla_info_conductor(self):
-        WebDriverWait(self.driver,40).until(
-            EC.visibility_of_element_located(self.pantalla_info_conductor)
-        )
+#  Validar que aparezca la pantalla buscar un taxi
+    def timer_descendente(self):
+        for contador in range(50, -1, -1):
+            print(f'Buscando conductor: {contador}')
+#        print(self.get_order_screen_title())
 
 
+    def get_order_screen_title(self):
+        return self.driver.find_element(*self.order_wait_screen_title).get_attribute('innerText')
 
 
 
@@ -300,7 +304,6 @@ class TestUrbanRoutes:
 
 # 2. Seleccionar la tarifa Comfort.
     def test_seleccionar_tarifa_confort(self):
-        self.test_set_route()
         routes_page = UrbanRoutesPage(self.driver)
         routes_page.click_boton_pedir_taxi()
         routes_page.click_boton_tarifa_confort()
@@ -308,7 +311,6 @@ class TestUrbanRoutes:
 
 #3. Rellenar el número de teléfono.
     def test_ingresar_numero_telefono(self):
-        self.test_seleccionar_tarifa_confort()
         routes_page = UrbanRoutesPage(self.driver)
         routes_page.click_boton_numero_telefono()
         phone_number = data.phone_number
@@ -322,7 +324,6 @@ class TestUrbanRoutes:
 
 # 4. Agregar una tarjeta de crédito.
     def test_ingresar_metodo_de_pago(self):
-        self.test_ingresar_numero_telefono()
         routes_page = UrbanRoutesPage(self.driver)
         routes_page.click_boton_metodo_pago()
         routes_page.click_boton_agregar_tarjeta()
@@ -337,7 +338,6 @@ class TestUrbanRoutes:
 
 # 5. Escribir un mensaje para el controlador.
     def test_mensaje_conductor(self):
-        self.test_ingresar_metodo_de_pago()
         routes_page = UrbanRoutesPage(self.driver)
         mensaje = data.message_for_driver
         routes_page.set_campo_mensaje_conductor(mensaje)
@@ -345,15 +345,12 @@ class TestUrbanRoutes:
 
 # 6. Pedir una manta y pañuelos.
     def test_adicionar_mantas_y_panuelos(self):
-        self.test_mensaje_conductor()
         routes_page = UrbanRoutesPage(self.driver)
         routes_page.click_adicionar_mantas()
-
-
+        assert routes_page.get_manta_checked()
 
 # 7. Pedir 2 helados.
     def test_pedir_helados(self):
-        self.test_adicionar_mantas_y_panuelos()
         routes_page = UrbanRoutesPage(self.driver)
         routes_page.click_boton_adicionar_helados()
         routes_page.click_boton_adicionar_helados()
@@ -361,9 +358,11 @@ class TestUrbanRoutes:
         
 # 8. Aparece el modal para buscar un taxi.
     def test_reservar_taxi(self):
-        self.test_pedir_helados()
         routes_page = UrbanRoutesPage(self.driver)
+        routes_page.get_boton_reservar_taxi()
         routes_page.click_boton_reservar_taxi()
+        routes_page.timer_descendente()
+        assert "Buscar automóvil" in routes_page.get_order_screen_title()
 
 
     @classmethod
